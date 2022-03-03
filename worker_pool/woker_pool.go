@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"sync"
+	"time"
 )
 
 
@@ -35,9 +36,20 @@ func (w Worker) Start() {
 			w.WorkerPool <- w.JobChannel
 			select {
 			case job := <- w.JobChannel:
-				//log.Println("Execute job ...")
-				job.Payload.Exec(job.Args ...)
-				w.Wg.Done()
+				{
+					queryStart := time.Now()
+					row := job.Payload.QueryRow(job.Args ...)
+					queryEnd := time.Now()
+					var id int
+					var firstName string
+					var lastName string
+
+					row.Scan(&id, &firstName, &lastName)
+					log.Printf("Got this people with id: %d, firstname: %s, lastname: %s, took time: %v", id, firstName, lastName, queryEnd.Sub(queryStart))
+					w.Wg.Done()
+					job.Payload.Close()
+				}
+
 			case <- w.quit:
 				return
 			}
