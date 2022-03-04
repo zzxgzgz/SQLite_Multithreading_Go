@@ -49,9 +49,14 @@ func main(){
 	TruncateTableStatement, _ := database.Prepare("DELETE FROM people")
 	TruncateTableStatement.Exec()
 
+	CreateFirstNameIndexStatement, _ := database.Prepare("CREATE INDEX idx_people_firstname ON people (firstname)")
+	CreateFirstNameIndexStatement.Exec()
+
+	CreateLastNameIndexStatement, _ := database.Prepare("CREATE INDEX idx_people_lastname ON people (lastname)")
+	CreateLastNameIndexStatement.Exec()
+
 	GeneratePeople()
 
-	InsertStatement, _ = database.Prepare("INSERT INTO people (firstname, lastname) VALUES (?, ?)")
 	insertPeopleStartTime := time.Now()
 	InsertPeopleIntoDB()
 	insertPeopleEndTime := time.Now()
@@ -97,6 +102,8 @@ func GeneratePeople(){
 // InsertPeopleIntoDB When writing into a sqlite db, we'd better do it sequentially,
 // or it will cause LOCK related errors
 func InsertPeopleIntoDB() {
+	tx, _ := database.Begin()
+	InsertStatement, _ = tx.Prepare("INSERT INTO people (firstname, lastname) VALUES (?, ?)")
 	for i, _ := range peopleSlice {
 		ArgumentsInterface := make([]interface{}, 2)
 		ArgumentsInterface[0] = peopleSlice[i].FirstName
@@ -107,6 +114,8 @@ func InsertPeopleIntoDB() {
 			log.Fatalf("Error happened when inserting people %d: %s", i, err.Error())
 		}
 	}
+	tx.Commit()
+	InsertStatement.Close()
 }
 
 // QueryPeopleFromDB When reading from a sqlite db, we can send queries concurrently

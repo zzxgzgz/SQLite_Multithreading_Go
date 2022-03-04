@@ -45,7 +45,8 @@ func (w Worker) Start() {
 					var lastName string
 
 					row.Scan(&id, &firstName, &lastName)
-					log.Printf("Got this people with id: %d, firstname: %s, lastname: %s, took time: %v", id, firstName, lastName, queryEnd.Sub(queryStart))
+					queryEnd.Sub(queryStart)
+					//log.Printf("Got this people with id: %d, firstname: %s, lastname: %s, took time: %v", id, firstName, lastName, queryEnd.Sub(queryStart))
 					w.Wg.Done()
 					job.Payload.Close()
 				}
