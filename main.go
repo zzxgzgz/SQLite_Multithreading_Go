@@ -7,13 +7,14 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"math/rand"
+	"runtime"
 	"sync"
 	"time"
 )
 
 var (
 	// MaxWorker Number of Workers
-	MaxWorker = 16
+	MaxWorker = runtime.NumCPU() * 2
 	// MaxQueue Max Size of the Job Queue
 	MaxQueue = 1024
 	// NumberOfPeople how many people to generate
