@@ -3,7 +3,6 @@ package main
 import (
 	"SQLite_Multithreading_Go/worker_pool"
 	"database/sql"
-	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"math/rand"
@@ -18,12 +17,13 @@ var (
 	// MaxQueue Max Size of the Job Queue
 	MaxQueue = 1024
 	// NumberOfPeople how many people to generate
-	NumberOfPeople = 1024
+	NumberOfPeople = 1024 * 100
 	// JobQueue a queue that sends the sql.Stmt jobs to the workers
 	JobQueue chan worker_pool.Job
 	letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	// InsertStatement INSERT INTO people (firstname, lastname) VALUES (?, ?)
 	InsertStatement *sql.Stmt
+	QueryStatement *sql.Stmt
 	peopleSlice []*People
 	allQueryStart time.Time
 	allQueryEnd time.Time
@@ -35,7 +35,7 @@ func main(){
 	log.Println("Hello world!")
 
 	// Open the database, this command creates the .db file if it doesn't exist.
-	database, _ = sql.Open("sqlite3", "./rio_testing.db")
+	database, _ = sql.Open("sqlite3", "./rio_testing.db?cache=shared&mode=rwc")
 	wg := sync.WaitGroup{}
 	// run the job dispatcher.
 	dispatcher := worker_pool.NewDispatcher(MaxWorker, JobQueue, &wg)
@@ -120,16 +120,24 @@ func InsertPeopleIntoDB() {
 
 // QueryPeopleFromDB When reading from a sqlite db, we can send queries concurrently
 func QueryPeopleFromDB(){
-	QueryPeopleStatementSlice := make([]*sql.Stmt, NumberOfPeople)
-	for i, _ := range peopleSlice {
-		queryPeopleString := fmt.Sprintf("SELECT id, firstname, lastname FROM people WHERE firstname = '%s' AND lastname = '%s'", peopleSlice[i].FirstName, peopleSlice[i].LastName)
-		QueryPeopleStatementSlice[i],_ = database.Prepare(queryPeopleString)
-	}
+	//QueryPeopleStatementSlice := make([]*sql.Stmt, NumberOfPeople)
+	//for i, _ := range peopleSlice {
+	//	queryPeopleString := fmt.Sprintf("SELECT id, firstname, lastname FROM people WHERE firstname = '%s' AND lastname = '%s'", peopleSlice[i].FirstName, peopleSlice[i].LastName)
+	//	QueryPeopleStatementSlice[i],_ = database.Prepare(queryPeopleString)
+	//}
+	//allQueryStart = time.Now()
+	//for i,_ := range QueryPeopleStatementSlice {
+	//	JobQueue <- worker_pool.Job{
+	//		Payload: QueryPeopleStatementSlice[i],
+	//		Args:    nil,
+	//	}
+	//}
 	allQueryStart = time.Now()
-	for i,_ := range QueryPeopleStatementSlice {
+	QueryStatement, _ = database.Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
+	for index, _ := range peopleSlice {
 		JobQueue <- worker_pool.Job{
-			Payload: QueryPeopleStatementSlice[i],
-			Args:    nil,
+			Payload: QueryStatement,
+			Args:    []interface{}{peopleSlice[index].FirstName, peopleSlice[index].LastName},
 		}
 	}
 }

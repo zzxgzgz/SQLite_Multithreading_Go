@@ -2,9 +2,9 @@ package worker_pool
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"sync"
-	"time"
 )
 
 
@@ -37,18 +37,22 @@ func (w Worker) Start() {
 			select {
 			case job := <- w.JobChannel:
 				{
-					queryStart := time.Now()
+					//queryStart := time.Now()
 					row := job.Payload.QueryRow(job.Args ...)
-					queryEnd := time.Now()
+					//queryEnd := time.Now()
 					var id int
 					var firstName string
 					var lastName string
 
 					row.Scan(&id, &firstName, &lastName)
-					queryEnd.Sub(queryStart)
+					//queryEnd.Sub(queryStart)
+					if firstName != job.Args[0] || lastName != job.Args[1] {
+						panic(fmt.Sprintf("Query for firstname: %s, lastname: %s; got firstname: %s, lastname: %s",
+							job.Args[0], job.Args[1], firstName, lastName))
+					}
 					//log.Printf("Got this people with id: %d, firstname: %s, lastname: %s, took time: %v", id, firstName, lastName, queryEnd.Sub(queryStart))
 					w.Wg.Done()
-					job.Payload.Close()
+					//job.Payload.Close()
 				}
 
 			case <- w.quit:
