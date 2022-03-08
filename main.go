@@ -17,7 +17,7 @@ var (
 	// MaxQueue Max Size of the Job Queue
 	MaxQueue = 1024
 	// NumberOfPeople how many people to generate
-	NumberOfPeople = 1024 * 100
+	NumberOfPeople = 1024 * 800
 	// JobQueue a queue that sends the sql.Stmt jobs to the workers
 	JobQueue chan worker_pool.Job
 	letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -27,32 +27,37 @@ var (
 	peopleSlice []*People
 	allQueryStart time.Time
 	allQueryEnd time.Time
-	database *sql.DB
+	//database *sql.DB
+	db_connections []*sql.DB
 )
 
 func main(){
 	JobQueue = make(chan worker_pool.Job, MaxQueue)
+	db_connections = make([]*sql.DB, MaxWorker)
 	log.Println("Hello world!")
-
+	for i := 0 ; i < MaxWorker ; i ++ {
+		db_connections[i], _ = sql.Open("sqlite3", "./rio_testing.db?cache=shared&mode=rwc")
+	}
 	// Open the database, this command creates the .db file if it doesn't exist.
-	database, _ = sql.Open("sqlite3", "./rio_testing.db?cache=shared&mode=rwc")
+	//database, _ = sql.Open("sqlite3", "./rio_testing.db?cache=shared&mode=rwc")
+	//database.SetMaxOpenConns(MaxWorker)
 	wg := sync.WaitGroup{}
 	// run the job dispatcher.
 	dispatcher := worker_pool.NewDispatcher(MaxWorker, JobQueue, &wg)
 	dispatcher.Run()
 
 	// Create table if it doesn't already exist/
-	CreateTableStatement, _ := database.Prepare("CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, firstname TEXT, lastname TEXT)")
+	CreateTableStatement, _ := db_connections[0].Prepare("CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, firstname TEXT, lastname TEXT)")
 	CreateTableStatement.Exec()
 
 	// Clear the table so that it is empty.
-	TruncateTableStatement, _ := database.Prepare("DELETE FROM people")
+	TruncateTableStatement, _ := db_connections[0].Prepare("DELETE FROM people")
 	TruncateTableStatement.Exec()
 
-	CreateFirstNameIndexStatement, _ := database.Prepare("CREATE INDEX idx_people_firstname ON people (firstname)")
+	CreateFirstNameIndexStatement, _ := db_connections[0].Prepare("CREATE INDEX idx_people_firstname ON people (firstname)")
 	CreateFirstNameIndexStatement.Exec()
 
-	CreateLastNameIndexStatement, _ := database.Prepare("CREATE INDEX idx_people_lastname ON people (lastname)")
+	CreateLastNameIndexStatement, _ := db_connections[0].Prepare("CREATE INDEX idx_people_lastname ON people (lastname)")
 	CreateLastNameIndexStatement.Exec()
 
 	GeneratePeople()
@@ -102,7 +107,7 @@ func GeneratePeople(){
 // InsertPeopleIntoDB When writing into a sqlite db, we'd better do it sequentially,
 // or it will cause LOCK related errors
 func InsertPeopleIntoDB() {
-	tx, _ := database.Begin()
+	tx, _ := db_connections[0].Begin()
 	InsertStatement, _ = tx.Prepare("INSERT INTO people (firstname, lastname) VALUES (?, ?)")
 	for i, _ := range peopleSlice {
 		ArgumentsInterface := make([]interface{}, 2)
@@ -133,10 +138,14 @@ func QueryPeopleFromDB(){
 	//	}
 	//}
 	allQueryStart = time.Now()
-	QueryStatement, _ = database.Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
+	QueryStatementSlice := make([]*sql.Stmt, MaxWorker)
+	for i := 0 ; i < MaxWorker ; i ++ {
+		QueryStatementSlice[i], _ = db_connections[i].Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
+	}
+	//QueryStatement, _ = database.Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
 	for index, _ := range peopleSlice {
 		JobQueue <- worker_pool.Job{
-			Payload: QueryStatement,
+			Payload: QueryStatementSlice[index % MaxWorker],
 			Args:    []interface{}{peopleSlice[index].FirstName, peopleSlice[index].LastName},
 		}
 	}
