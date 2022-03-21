@@ -37,6 +37,11 @@ func (w Worker) Start() {
 			select {
 			case job := <- w.JobChannel:
 				{
+				//w.Wg.Done()
+				//if job.Args[0] != job.Args[0] || job.Args[1] != job.Args[1] {
+				//	panic("End")
+				//}
+
 					//queryStart := time.Now()
 					row := job.Payload.QueryRow(job.Args ...)
 					//queryEnd := time.Now()
@@ -53,6 +58,8 @@ func (w Worker) Start() {
 					//log.Printf("Got this people with id: %d, firstname: %s, lastname: %s, took time: %v", id, firstName, lastName, queryEnd.Sub(queryStart))
 					w.Wg.Done()
 					//job.Payload.Close()
+
+
 				}
 
 			case <- w.quit:
@@ -98,10 +105,10 @@ func (d *Dispatcher) dispatch(){
 	for {
 		select {
 		case job := <- d.JobQueue:
-			go func(job Job){
+			//go func(job Job){
 				jobChannel := <-d.WorkerPool
 				jobChannel <- job
-			}(job)
+			//}(job)
 		}
 	}
 }

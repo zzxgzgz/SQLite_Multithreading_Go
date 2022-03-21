@@ -42,7 +42,7 @@ func main(){
 	//	db_connections[i], _ = sql.Open("sqlite3", "file:./rio_testing.db?cache=shared&mode=rwc")
 	//}
 	// mode: read write
-	db_write_connection, _ = sql.Open("sqlite3", "file:./rio_testing.db?&mode=rw&_journal_mode=wal")
+	db_write_connection, _ = sql.Open("sqlite3", "file:./rio_testing.db?&mode=rw&_journal_mode=wal&_txlock=immediate")
 	// only ONE writer, as SQLite doesn't support multiple concurrent write.
 	db_write_connection.SetMaxOpenConns(1)
 	// mode: read only
