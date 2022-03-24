@@ -24,7 +24,7 @@ type Worker struct {
 func NewWorker(workerPool chan chan Job, wg *sync.WaitGroup) Worker{
 	return Worker{
 		WorkerPool: workerPool,
-		JobChannel: make(chan Job),
+		JobChannel: make(chan Job, 1024 * 1024),
 		quit: make(chan bool),
 		Wg: wg,
 	}

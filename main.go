@@ -13,7 +13,7 @@ import (
 
 var (
 	// MaxWorker Number of Workers
-	MaxWorker = runtime.NumCPU() * 2
+	MaxWorker = runtime.NumCPU() //* 2
 	// MaxQueue Max Size of the Job Queue
 	MaxQueue = 1024
 	// NumberOfPeople how many people to generate
@@ -46,7 +46,7 @@ func main(){
 	// only ONE writer, as SQLite doesn't support multiple concurrent write.
 	db_write_connection.SetMaxOpenConns(1)
 	// mode: read only
-	db_read_connection, _ = sql.Open("sqlite3", "file:./rio_testing.db?&mode=ro&_journal_mode=wal")
+	db_read_connection, _ = sql.Open("sqlite3", "file:./rio_testing.db?&mode=ro&_journal_mode=wal&_mutex=full&cache=shared")
 	// can have many readers
 	db_read_connection.SetMaxOpenConns(MaxWorker)
 	// mode: read write create
@@ -68,10 +68,10 @@ func main(){
 	TruncateTableStatement, _ := db_create_connection.Prepare("DELETE FROM people")
 	TruncateTableStatement.Exec()
 
-	CreateFirstNameIndexStatement, _ := db_create_connection.Prepare("CREATE INDEX idx_people_firstname ON people (firstname)")
+	CreateFirstNameIndexStatement, _ := db_create_connection.Prepare("CREATE INDEX IF NOT EXISTS idx_people_firstname ON people (firstname)")
 	CreateFirstNameIndexStatement.Exec()
 
-	CreateLastNameIndexStatement, _ := db_create_connection.Prepare("CREATE INDEX idx_people_lastname ON people (lastname)")
+	CreateLastNameIndexStatement, _ := db_create_connection.Prepare("CREATE INDEX IF NOT EXISTS idx_people_lastname ON people (lastname)")
 	CreateLastNameIndexStatement.Exec()
 
 	// close the create table connection
@@ -162,7 +162,9 @@ func QueryPeopleFromDB(){
 	//for i := 0 ; i < MaxWorker ; i ++ {
 	//	QueryStatementSlice[i], _ = db_connections[i].Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
 	//}
-
+	//var id int
+	//var firstName string
+	//var lastName string
 	QueryStatement, _ = db_read_connection.Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
 	//QueryStatement, _ = database.Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
 	for index, _ := range peopleSlice {
@@ -170,5 +172,13 @@ func QueryPeopleFromDB(){
 			Payload: QueryStatement,
 			Args:    []interface{}{peopleSlice[index].FirstName, peopleSlice[index].LastName},
 		}
+		//row:=db_read_connection.QueryRow("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?", peopleSlice[index].FirstName, peopleSlice[index].LastName)
+		////row := QueryStatement.QueryRow(peopleSlice[index].FirstName, peopleSlice[index].LastName)
+		//row.Scan(&id, &firstName, &lastName)
+		////queryEnd.Sub(queryStart)
+		//if firstName != peopleSlice[index].FirstName || lastName != peopleSlice[index].LastName {
+		//	panic(fmt.Sprintf("Query for firstname: %s, lastname: %s; got firstname: %s, lastname: %s",
+		//		peopleSlice[index].FirstName, peopleSlice[index].LastName, firstName, lastName))
+		//}
 	}
 }
