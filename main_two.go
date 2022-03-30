@@ -68,19 +68,19 @@ func main(){
 	insertEnd := time.Now().Unix()
 	//随机检索10M次
 	wg := sync.WaitGroup{}
-	for i := 0 ; i < 1; i ++ {
+	query_statement, err := db.Prepare("select b_code, c_code, code_type, is_new from BC where c_code = ? ")
+	defer query_statement.Close()
+	for i := 0 ; i < runtime.NumCPU() ; i ++ {
 		wg.Add(1)
 		go func(i int) {
 			var count int64 = 0
 			fmt.Printf("Starting go-routine %d\n", i)
-			stmt, err = db.Prepare("select b_code, c_code, code_type, is_new from BC where c_code = ? ")
 			if err != nil {
 				fmt.Println("select err %q", err)
 			}
-			defer stmt.Close()
 			bc := new(BCCode)
-			for i := 0; i < total; i++ {
-				err := stmt.QueryRow(fmt.Sprintf("C%024d", i)).Scan(&bc.B_Code, &bc.C_Code, &bc.CodeType, &bc.IsNew)
+			for j := 0; j < total; j++ {
+				err := query_statement.QueryRow(fmt.Sprintf("C%024d", j)).Scan(&bc.B_Code, &bc.C_Code, &bc.CodeType, &bc.IsNew)
 				if err != nil {
 					fmt.Printf("query err %q", err)
 					os.Exit(-1)
