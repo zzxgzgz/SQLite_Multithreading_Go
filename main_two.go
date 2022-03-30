@@ -25,7 +25,7 @@ func main(){
 	}
 
 	//SQLite in memory，小心，不能只写:memory:,这样每一次连接都会申请内存
-	db, err := sql.Open("sqlite3", "file:./rio_testing.db?cache=shared&loc=auto&_journal_mode=wal")
+	db, err := sql.Open("sqlite3", "file:./rio_testing.db?loc=auto&_journal_mode=wal&_mutex=no")
 	db.SetMaxOpenConns(runtime.NumCPU())
 	if err != nil {
 		fmt.Println("SQLite:", err)
@@ -73,6 +73,7 @@ func main(){
 	for i := 0 ; i < runtime.NumCPU() ; i ++ {
 		wg.Add(1)
 		go func(i int) {
+			query_start  := time.Now().Unix()
 			var count int64 = 0
 			fmt.Printf("Starting go-routine %d\n", i)
 			if err != nil {
@@ -92,7 +93,7 @@ func main(){
 			}
 			readEnd := time.Now().Unix()
 			fmt.Println("go-routine: ", i , "insert span=", (insertEnd - start),
-				"read span=", (readEnd - insertEnd),
+				"read span=", (readEnd - query_start),
 				"avg read=", float64(readEnd-insertEnd)*1000/float64(count))
 			wg.Done()
 		}(i)
