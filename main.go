@@ -17,9 +17,9 @@ var (
 	// MaxQueue Max Size of the Job Queue
 	MaxQueue = 1024
 	// NumberOfPeople how many people to generate
-	NumberOfPeople = 1024 * 1024 * 20
+	NumberOfPeople = 1024 * 1024 //* 20
 	// JobQueue a queue that sends the sql.Stmt jobs to the workers
-	JobQueue chan worker_pool.Job
+	JobQueue chan *worker_pool.Job
 	letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	// InsertStatement INSERT INTO people (firstname, lastname) VALUES (?, ?)
 	InsertStatement *sql.Stmt
@@ -35,7 +35,8 @@ var (
 )
 
 func main(){
-	JobQueue = make(chan worker_pool.Job, MaxQueue)
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	JobQueue = make(chan *worker_pool.Job, MaxQueue)
 	//db_connections = make([]*sql.DB, MaxWorker)
 	log.Println("Hello world!")
 	//for i := 0 ; i < MaxWorker ; i ++ {
@@ -46,7 +47,7 @@ func main(){
 	// only ONE writer, as SQLite doesn't support multiple concurrent write.
 	db_write_connection.SetMaxOpenConns(1)
 	// mode: read only
-	db_read_connection, _ = sql.Open("sqlite3", "file:./rio_testing.db?&mode=ro&_journal_mode=wal&_mutex=full&cache=shared")
+	db_read_connection, _ = sql.Open("sqlite3", "file:./rio_testing.db?&mode=ro&_journal_mode=wal&_mutex=full&cache=shared&loc=auto")
 	// can have many readers
 	db_read_connection.SetMaxOpenConns(MaxWorker)
 	// mode: read write create
@@ -71,8 +72,8 @@ func main(){
 	CreateFirstNameIndexStatement, _ := db_create_connection.Prepare("CREATE INDEX IF NOT EXISTS idx_people_firstname ON people (firstname)")
 	CreateFirstNameIndexStatement.Exec()
 
-	CreateLastNameIndexStatement, _ := db_create_connection.Prepare("CREATE INDEX IF NOT EXISTS idx_people_lastname ON people (lastname)")
-	CreateLastNameIndexStatement.Exec()
+	//CreateLastNameIndexStatement, _ := db_create_connection.Prepare("CREATE INDEX IF NOT EXISTS idx_people_lastname ON people (lastname)")
+	//CreateLastNameIndexStatement.Exec()
 
 	// close the create table connection
 	db_create_connection.Close()
@@ -168,7 +169,7 @@ func QueryPeopleFromDB(){
 	QueryStatement, _ = db_read_connection.Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
 	//QueryStatement, _ = database.Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
 	for index, _ := range peopleSlice {
-		JobQueue <- worker_pool.Job{
+		JobQueue <- &worker_pool.Job{
 			Payload: QueryStatement,
 			Args:    []interface{}{peopleSlice[index].FirstName, peopleSlice[index].LastName},
 		}

@@ -15,16 +15,16 @@ type Job struct {
 }
 
 type Worker struct {
-	WorkerPool chan chan Job
-	JobChannel chan  Job
+	WorkerPool chan chan *Job
+	JobChannel chan  *Job
 	quit chan bool
 	Wg *sync.WaitGroup
 }
 
-func NewWorker(workerPool chan chan Job, wg *sync.WaitGroup) Worker{
+func NewWorker(workerPool chan chan *Job, wg *sync.WaitGroup) Worker{
 	return Worker{
 		WorkerPool: workerPool,
-		JobChannel: make(chan Job, 1024 * 1024),
+		JobChannel: make(chan *Job, 1024 * 1024),
 		quit: make(chan bool),
 		Wg: wg,
 	}
@@ -77,13 +77,13 @@ func (w Worker) Stop() {
 
 type Dispatcher struct {
 	MaxWorkers int
-	WorkerPool chan chan Job
-	JobQueue chan Job
+	WorkerPool chan chan *Job
+	JobQueue chan *Job
 	Wg *sync.WaitGroup
 }
 
-func NewDispatcher(maxWorkers int, jobQueue chan Job, waitGroup *sync.WaitGroup) *Dispatcher {
-	pool := make(chan chan Job, maxWorkers)
+func NewDispatcher(maxWorkers int, jobQueue chan *Job, waitGroup *sync.WaitGroup) *Dispatcher {
+	pool := make(chan chan *Job, maxWorkers)
 	return &Dispatcher{
 		MaxWorkers: maxWorkers,
 		WorkerPool: pool,
@@ -105,10 +105,10 @@ func (d *Dispatcher) dispatch(){
 	for {
 		select {
 		case job := <- d.JobQueue:
-			//go func(job Job){
+			go func(job *Job){
 				jobChannel := <-d.WorkerPool
 				jobChannel <- job
-			//}(job)
+			}(job)
 		}
 	}
 }
