@@ -62,7 +62,7 @@ func main(){
 	if err != nil {
 		fmt.Println("%q", err)
 	}
-	stmt, err := tx.Prepare("insert into BC(code_type, is_new ) values(?, ?)")
+	stmt, err := tx.Prepare("insert into BC(code_type, is_new ) values(RANDOM(), RANDOM())")
 	if err != nil {
 		fmt.Println("insert err %q", err)
 	}
@@ -70,8 +70,8 @@ func main(){
 	var m int = 1000 * 1//000
 	var total int = 1 * m
 	for i := 0; i < total; i++ {
-		rand.Seed(time.Now().UnixNano())
-		_, err = stmt.Exec(rand.Intn(total), rand.Intn(total))
+		//rand.Seed(time.Now().UnixNano())
+		_, err = stmt.Exec()
 		if err != nil {
 			fmt.Println("%q", err)
 		}
@@ -83,17 +83,17 @@ func main(){
 	//query_statement, err := db.Prepare("select b_code, c_code, code_type, is_new from BC where c_code = ? ")
 	query_statements := make([]*sql.Stmt, number_of_db_connections)
 	for i := 0 ; i < number_of_db_connections ; i ++{
-		query_statements[i], _ = db_connections[i].Prepare(" SELECT is_new FROM  BC where code_type = ? LIMIT 1")
+		query_statements[i], _ = db_connections[i].Prepare(" SELECT is_new FROM  BC where code_type = RANDOM() LIMIT 1")
 	}
 	//defer query_statement.Close()
 	for i := 0 ; i < number_of_go_routines ; i ++ {
 		wg.Add(1)
 		go func(i int, query_statement *sql.Stmt) {
-			c_code_slice := make([]int, total)
-			for k := 0 ; k < total ; k ++ {
-				rand.Seed(time.Now().UnixNano())
-				c_code_slice[k] = rand.Intn(total)
-			}
+			//c_code_slice := make([]int, total)
+			//for k := 0 ; k < total ; k ++ {
+			//	rand.Seed(time.Now().UnixNano())
+			//	c_code_slice[k] = rand.Intn(total)
+			//}
 			query_start  := time.Now().Unix()
 			var count int64 = 0
 			fmt.Printf("Starting go-routine %d\n", i)
@@ -102,7 +102,7 @@ func main(){
 			}
 			bc := new(BCCode)
 			for j := 0; j < total; j++ {
-				query_statement.QueryRow(c_code_slice[j]).Scan(&bc.IsNew)
+				query_statement.QueryRow()//.Scan(&bc.IsNew)
 				//if err != nil {
 				//	fmt.Printf("query err %q", err)
 				//	os.Exit(-1)
