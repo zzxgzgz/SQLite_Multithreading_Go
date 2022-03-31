@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"sync"
@@ -26,10 +27,16 @@ func main(){
 	number_of_go_routines := 20
 	//SQLite in memory，小心，不能只写:memory:,这样每一次连接都会申请内存
 	db, err := sql.Open("sqlite3", "file:./rio_testing.db?loc=auto&_journal_mode=wal&_mutex=no")
-	db_connections := make([]*sql.DB, number_of_go_routines)
-	for i := 0 ; i < number_of_go_routines ; i ++{
+
+	// one DB connection can be used by two go-routines
+	number_of_db_connections := int(math.Ceil(number_of_go_routines % 2.0))
+
+	db_connections := make([]*sql.DB, number_of_db_connections)
+
+	for i := 0 ; i < number_of_db_connections ; i ++{
 		db_connections[i],_ = sql.Open("sqlite3", "file:./rio_testing.db?loc=auto&_journal_mode=wal&_mutex=no")
 	}
+
 	db.SetMaxOpenConns(runtime.NumCPU())
 	if err != nil {
 		fmt.Println("SQLite:", err)
@@ -73,8 +80,8 @@ func main(){
 	//随机检索10M次
 	wg := sync.WaitGroup{}
 	//query_statement, err := db.Prepare("select b_code, c_code, code_type, is_new from BC where c_code = ? ")
-	query_statements := make([]*sql.Stmt, number_of_go_routines)
-	for i := 0 ; i < number_of_go_routines ; i ++{
+	query_statements := make([]*sql.Stmt, number_of_db_connections)
+	for i := 0 ; i < number_of_db_connections ; i ++{
 		query_statements[i], _ = db_connections[i].Prepare("select b_code, c_code, code_type, is_new from BC where c_code = ? ")
 	}
 	//defer query_statement.Close()
@@ -104,7 +111,7 @@ func main(){
 				"read span=", (readEnd - query_start),
 				"avg read=", float64(readEnd-insertEnd)*1000/float64(count))
 			wg.Done()
-		}(i, query_statements[i])
+		}(i, query_statements[i % number_of_db_connections])
 	}
 	wg.Wait()
 	fmt.Println("All finished.")
