@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"math/rand"
+
 	//"math/rand"
 	"runtime"
 	"sync"
@@ -98,7 +100,7 @@ func main(){
 	//query_statement, err := db.Prepare("select b_code, c_code, code_type, is_new from BC where c_code = ? ")
 	query_statements := make([]*sql.Stmt, number_of_db_connections)
 	for i := 0 ; i < number_of_db_connections ; i ++{
-		query_statements[i], _ = db_connections[i].Prepare(" SELECT * FROM  perfTest where indexedColumn = 1")
+		query_statements[i], _ = db_connections[i].Prepare(" SELECT indexedColumn FROM  perfTest where indexedColumn = ?")
 	}
 	//defer query_statement.Close()
 	for i := 0 ; i < number_of_go_routines ; i ++ {
@@ -106,8 +108,8 @@ func main(){
 		go func(i int, query_statement *sql.Stmt) {
 			//c_code_slice := make([]int, total)
 			//for k := 0 ; k < total ; k ++ {
-			//	rand.Seed(time.Now().UnixNano())
-			//	c_code_slice[k] = rand.Intn(total)
+			//	//rand.Seed(time.Now().UnixNano())
+			//	c_code_slice[k] = -8296290926683469535
 			//}
 			query_start  := time.Now().Unix()
 			var count int64 = 0
@@ -115,17 +117,20 @@ func main(){
 			if err != nil {
 				fmt.Println("select err %q", err)
 			}
-			bc := new(BCCode)
+			//bc := new(BCCode)
 			for j := 0; j < total; j++ {
-				query_statement.QueryRow().Scan(&bc.IndexedRow, &bc.NonIndexedRow)
+				query_statement.QueryRow(-8296290926683469535)//.Scan(&bc.IndexedRow, &bc.NonIndexedRow)
 				//if err != nil {
 				//	fmt.Printf("query err %q", err)
 				//	os.Exit(-1)
 				//}
 
 				//屏幕输出会花掉好多时间啊，计算耗时的时候还是关掉比较好
-				fmt.Println("\tNonIndexedRow=", bc.NonIndexedRow, "\tIndexedRow=", bc.IndexedRow)
+				//fmt.Println("\tNonIndexedRow=", bc.NonIndexedRow, "\tIndexedRow=", bc.IndexedRow)
 				count++
+				if count % 10000 == 0 {
+					fmt.Println("Count: ", count)
+				}
 			}
 			readEnd := time.Now().Unix()
 			fmt.Println("go-routine: ", i , "insert span=", (insertEnd - start),
