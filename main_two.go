@@ -4,9 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
-	"math/rand"
-
-	//"math/rand"
 	"runtime"
 	"sync"
 	"time"
