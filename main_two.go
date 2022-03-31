@@ -71,7 +71,7 @@ func main(){
 	var total int = 1 * m
 	for i := 0; i < total; i++ {
 		rand.Seed(time.Now().UnixNano())
-		_, err = stmt.Exec(rand.Int(), rand.Int())
+		_, err = stmt.Exec(rand.Intn(total), rand.Intn(total))
 		if err != nil {
 			fmt.Println("%q", err)
 		}
@@ -92,7 +92,7 @@ func main(){
 			c_code_slice := make([]int, total)
 			for k := 0 ; k < total ; k ++ {
 				rand.Seed(time.Now().UnixNano())
-				c_code_slice[k] = rand.Int()
+				c_code_slice[k] = rand.Intn(total)
 			}
 			query_start  := time.Now().Unix()
 			var count int64 = 0
