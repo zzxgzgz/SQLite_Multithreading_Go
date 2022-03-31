@@ -21,8 +21,8 @@ func main(){
 	type BCCode struct {
 		//B_Code string
 		//C_Code string
-		CodeType int // index this
-		IsNew int    // not index this
+		IndexedRow int // index this
+		NonIndexedRow int    // not index this
 	}
 	number_of_go_routines := 20
 	//SQLite in memory，小心，不能只写:memory:,这样每一次连接都会申请内存
@@ -98,7 +98,7 @@ CREATE INDEX perfTestIndexedColumn ON perfTest ( indexedColumn );`
 	//query_statement, err := db.Prepare("select b_code, c_code, code_type, is_new from BC where c_code = ? ")
 	query_statements := make([]*sql.Stmt, number_of_db_connections)
 	for i := 0 ; i < number_of_db_connections ; i ++{
-		query_statements[i], _ = db_connections[i].Prepare(" SELECT nonIndexedColumn FROM  perfTest where indexedColumn = 1 LIMIT 1")
+		query_statements[i], _ = db_connections[i].Prepare(" SELECT * FROM  perfTest where indexedColumn = 1")
 	}
 	//defer query_statement.Close()
 	for i := 0 ; i < number_of_go_routines ; i ++ {
@@ -115,16 +115,16 @@ CREATE INDEX perfTestIndexedColumn ON perfTest ( indexedColumn );`
 			if err != nil {
 				fmt.Println("select err %q", err)
 			}
-			//bc := new(BCCode)
+			bc := new(BCCode)
 			for j := 0; j < total; j++ {
-				query_statement.QueryRow()//.Scan(&bc.IsNew)
+				query_statement.QueryRow().Scan(&bc.IndexedRow, &bc.NonIndexedRow)
 				//if err != nil {
 				//	fmt.Printf("query err %q", err)
 				//	os.Exit(-1)
 				//}
 
 				//屏幕输出会花掉好多时间啊，计算耗时的时候还是关掉比较好
-				//fmt.Println("\tIsNew=", bc.IsNew)
+				fmt.Println("\tNonIndexedRow=", bc.NonIndexedRow, "\tIndexedRow=", bc.IndexedRow)
 				count++
 			}
 			readEnd := time.Now().Unix()
