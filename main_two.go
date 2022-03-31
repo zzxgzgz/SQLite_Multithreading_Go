@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"os"
 	"runtime"
 	"sync"
 	"time"
