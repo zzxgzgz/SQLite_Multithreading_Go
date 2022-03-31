@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"math/rand"
 	"os"
 	"runtime"
 	"sync"
@@ -19,10 +20,10 @@ func main(){
 	// allocate memory for the program.
 	stub[0] = 1
 	type BCCode struct {
-		B_Code string
-		C_Code string
-		CodeType int
-		IsNew int
+		//B_Code string
+		//C_Code string
+		CodeType int // index this
+		IsNew int    // not index this
 	}
 	number_of_go_routines := 20
 	//SQLite in memory，小心，不能只写:memory:,这样每一次连接都会申请内存
@@ -44,14 +45,14 @@ func main(){
 	defer db.Close()
 	fmt.Println("SQLite start")
 	//创建表//delete from BC;，SQLite字段类型比较少，bool型可以用INTEGER，字符串用TEXT
-	sqlStmt := `create table BC (b_code text not null primary key, c_code text not null, code_type INTEGER, is_new INTEGER);`
+	sqlStmt := `create table BC (code_type INTEGER, is_new INTEGER);`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
 		fmt.Println("create table error->%q: %s\n", err, sqlStmt)
 		return
 	}
 	//创建索引，有索引和没索引性能差别巨大，根本就不是一个量级，有兴趣的可以去掉试试
-	_, err = db.Exec("CREATE INDEX inx_c_code ON BC(c_code);")
+	_, err = db.Exec("CREATE INDEX index_code_type ON BC(code_type);")
 	if err != nil {
 		fmt.Println("create index error->%q: %s\n", err, sqlStmt)
 		return
@@ -62,7 +63,7 @@ func main(){
 	if err != nil {
 		fmt.Println("%q", err)
 	}
-	stmt, err := tx.Prepare("insert into BC(b_code, c_code, code_type, is_new ) values(?,?,?,?)")
+	stmt, err := tx.Prepare("insert into BC(code_type, is_new ) values(?, ?)")
 	if err != nil {
 		fmt.Println("insert err %q", err)
 	}
@@ -70,7 +71,7 @@ func main(){
 	var m int = 1000 * 1000
 	var total int = 1 * m
 	for i := 0; i < total; i++ {
-		_, err = stmt.Exec(fmt.Sprintf("B%024d", i), fmt.Sprintf("C%024d", i), 0, 1)
+		_, err = stmt.Exec(rand.Int(), rand.Int())
 		if err != nil {
 			fmt.Println("%q", err)
 		}
@@ -82,15 +83,15 @@ func main(){
 	//query_statement, err := db.Prepare("select b_code, c_code, code_type, is_new from BC where c_code = ? ")
 	query_statements := make([]*sql.Stmt, number_of_db_connections)
 	for i := 0 ; i < number_of_db_connections ; i ++{
-		query_statements[i], _ = db_connections[i].Prepare("select b_code from BC where c_code = ? ")
+		query_statements[i], _ = db_connections[i].Prepare(" SELECT COUNT(*), AVG(is_new) FROM  (select code_type from BC where code_type > ? LIMIT 10)")
 	}
 	//defer query_statement.Close()
 	for i := 0 ; i < number_of_go_routines ; i ++ {
 		wg.Add(1)
 		go func(i int, query_statement *sql.Stmt) {
-			c_code_slice := make([]string, total)
+			c_code_slice := make([]int, total)
 			for k := 0 ; k < total ; k ++ {
-				c_code_slice[k] = fmt.Sprintf("C%024d", k)
+				c_code_slice[k] = rand.Int()
 			}
 			query_start  := time.Now().Unix()
 			var count int64 = 0
@@ -98,13 +99,13 @@ func main(){
 			if err != nil {
 				fmt.Println("select err %q", err)
 			}
-			bc := new(BCCode)
+			//bc := new(BCCode)
 			for j := 0; j < total; j++ {
-				err := query_statement.QueryRow(c_code_slice[j]).Scan(&bc.B_Code)
-				if err != nil {
-					fmt.Printf("query err %q", err)
-					os.Exit(-1)
-				}
+				query_statement.QueryRow(c_code_slice[j])//.Scan(&bc.B_Code)
+				//if err != nil {
+				//	fmt.Printf("query err %q", err)
+				//	os.Exit(-1)
+				//}
 
 				//屏幕输出会花掉好多时间啊，计算耗时的时候还是关掉比较好
 				//fmt.Println("BCode=", bc.B_Code, "\tCCode=", bc.C_Code, "\tCodeType=", bc.CodeType, "\tIsNew=", bc.IsNew)
