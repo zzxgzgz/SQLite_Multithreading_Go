@@ -29,7 +29,7 @@ func main(){
 	db, err := sql.Open("sqlite3", "file:./rio_testing.db?loc=auto&_journal_mode=wal&_mutex=no")
 
 	// one DB connection can be used by two go-routines
-	number_of_db_connections := int(math.Ceil(number_of_go_routines % 2.0))
+	number_of_db_connections := int(math.Ceil(float64(number_of_go_routines) / 2.0))
 
 	db_connections := make([]*sql.DB, number_of_db_connections)
 
