@@ -109,7 +109,7 @@ func main(){
 			readEnd := time.Now().Unix()
 			fmt.Println("go-routine: ", i , "insert span=", (insertEnd - start),
 				"read span=", (readEnd - query_start),
-				"avg read=", float64(readEnd-insertEnd)*1000/float64(count))
+				"avg read=", float64(readEnd-query_start)*1000/float64(count))
 			wg.Done()
 		}(i, query_statements[i % number_of_db_connections])
 	}
