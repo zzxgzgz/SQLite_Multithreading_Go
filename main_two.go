@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
-	"math/rand"
+	//"math/rand"
 	"runtime"
 	"sync"
 	"time"
@@ -44,7 +44,22 @@ func main(){
 	defer db.Close()
 	fmt.Println("SQLite start")
 	//创建表//delete from BC;，SQLite字段类型比较少，bool型可以用INTEGER，字符串用TEXT
-	sqlStmt := `create table BC (code_type INTEGER, is_new INTEGER);`
+	sqlStmt := `
+
+CREATE TABLE perfTest ( indexedColumn, nonIndexedColumn );
+
+WITH RECURSIVE
+    randdata(x, y) AS (
+        SELECT RANDOM(), RANDOM()
+            UNION ALL
+        SELECT RANDOM(), RANDOM() FROM randdata
+        LIMIT 1000*1000*1
+    )
+
+INSERT INTO perfTest ( indexedColumn, nonIndexedColumn )
+    SELECT * FROM randdata;
+
+CREATE INDEX perfTestIndexedColumn ON perfTest ( indexedColumn );`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
 		fmt.Println("create table error->%q: %s\n", err, sqlStmt)
@@ -58,32 +73,32 @@ func main(){
 	}
 	//写入10M条记录
 	start := time.Now().Unix()
-	tx, err := db.Begin()
+	//tx, err := db.Begin()
 	if err != nil {
 		fmt.Println("%q", err)
 	}
-	stmt, err := tx.Prepare("insert into BC(code_type, is_new ) values(RANDOM(), RANDOM())")
+	//stmt, err := tx.Prepare("insert into BC(code_type, is_new ) values(RANDOM(), RANDOM())")
 	if err != nil {
 		fmt.Println("insert err %q", err)
 	}
-	defer stmt.Close()
-	var m int = 1000 * 1//000
+	//defer stmt.Close()
+	var m int = 1000 * 1000
 	var total int = 1 * m
-	for i := 0; i < total; i++ {
-		//rand.Seed(time.Now().UnixNano())
-		_, err = stmt.Exec()
-		if err != nil {
-			fmt.Println("%q", err)
-		}
-	}
-	tx.Commit()
+	//for i := 0; i < total; i++ {
+	//	//rand.Seed(time.Now().UnixNano())
+	//	_, err = stmt.Exec()
+	//	if err != nil {
+	//		fmt.Println("%q", err)
+	//	}
+	//}
+	//tx.Commit()
 	insertEnd := time.Now().Unix()
 	//随机检索10M次
 	wg := sync.WaitGroup{}
 	//query_statement, err := db.Prepare("select b_code, c_code, code_type, is_new from BC where c_code = ? ")
 	query_statements := make([]*sql.Stmt, number_of_db_connections)
 	for i := 0 ; i < number_of_db_connections ; i ++{
-		query_statements[i], _ = db_connections[i].Prepare(" SELECT is_new FROM  BC where code_type = RANDOM() LIMIT 1")
+		query_statements[i], _ = db_connections[i].Prepare(" SELECT is_new FROM  BC where code_type = 1 LIMIT 1")
 	}
 	//defer query_statement.Close()
 	for i := 0 ; i < number_of_go_routines ; i ++ {
@@ -109,7 +124,7 @@ func main(){
 				//}
 
 				//屏幕输出会花掉好多时间啊，计算耗时的时候还是关掉比较好
-				fmt.Println("\tIsNew=", bc.IsNew)
+				//fmt.Println("\tIsNew=", bc.IsNew)
 				count++
 			}
 			readEnd := time.Now().Unix()
