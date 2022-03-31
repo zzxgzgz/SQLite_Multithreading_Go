@@ -44,27 +44,27 @@ func main(){
 	defer db.Close()
 	fmt.Println("SQLite start")
 	//创建表//delete from BC;，SQLite字段类型比较少，bool型可以用INTEGER，字符串用TEXT
-	sqlStmt := `
-
-CREATE TABLE perfTest ( indexedColumn, nonIndexedColumn );
-
-WITH RECURSIVE
-    randdata(x, y) AS (
-        SELECT RANDOM(), RANDOM()
-            UNION ALL
-        SELECT RANDOM(), RANDOM() FROM randdata
-        LIMIT 1000*1000*1
-    )
-
-INSERT INTO perfTest ( indexedColumn, nonIndexedColumn )
-    SELECT * FROM randdata;
-
-CREATE INDEX perfTestIndexedColumn ON perfTest ( indexedColumn );`
-	_, err = db.Exec(sqlStmt)
-	if err != nil {
-		fmt.Println("create table error->%q: %s\n", err, sqlStmt)
-		return
-	}
+//	sqlStmt := `
+//
+//CREATE TABLE perfTest ( indexedColumn, nonIndexedColumn );
+//
+//WITH RECURSIVE
+//    randdata(x, y) AS (
+//        SELECT RANDOM(), RANDOM()
+//            UNION ALL
+//        SELECT RANDOM(), RANDOM() FROM randdata
+//        LIMIT 1000*1000*1
+//    )
+//
+//INSERT INTO perfTest ( indexedColumn, nonIndexedColumn )
+//    SELECT * FROM randdata;
+//
+//CREATE INDEX perfTestIndexedColumn ON perfTest ( indexedColumn );`
+//	_, err = db.Exec(sqlStmt)
+//	if err != nil {
+//		fmt.Println("create table error->%q: %s\n", err, sqlStmt)
+//		return
+//	}
 	//创建索引，有索引和没索引性能差别巨大，根本就不是一个量级，有兴趣的可以去掉试试
 	//_, err = db.Exec("CREATE INDEX index_code_type ON BC(code_type);")
 	//if err != nil {
