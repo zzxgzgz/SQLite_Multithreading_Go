@@ -82,7 +82,7 @@ func main(){
 	//query_statement, err := db.Prepare("select b_code, c_code, code_type, is_new from BC where c_code = ? ")
 	query_statements := make([]*sql.Stmt, number_of_db_connections)
 	for i := 0 ; i < number_of_db_connections ; i ++{
-		query_statements[i], _ = db_connections[i].Prepare(" SELECT COUNT(*), AVG(is_new) FROM  BC where code_type > ? LIMIT 10")
+		query_statements[i], _ = db_connections[i].Prepare(" SELECT is_new FROM  BC where code_type = ? LIMIT 1")
 	}
 	//defer query_statement.Close()
 	for i := 0 ; i < number_of_go_routines ; i ++ {
@@ -100,7 +100,7 @@ func main(){
 			}
 			//bc := new(BCCode)
 			for j := 0; j < total; j++ {
-				query_statement.QueryRow(c_code_slice[j])//.Scan(&bc.B_Code)
+				query_statement.QueryRow(30)//.Scan(&bc.B_Code)
 				//if err != nil {
 				//	fmt.Printf("query err %q", err)
 				//	os.Exit(-1)
