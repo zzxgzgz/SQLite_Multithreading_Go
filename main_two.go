@@ -88,6 +88,10 @@ func main(){
 	for i := 0 ; i < number_of_go_routines ; i ++ {
 		wg.Add(1)
 		go func(i int, query_statement *sql.Stmt) {
+			c_code_slice := make([]string, total)
+			for k := 0 ; k < total ; k ++ {
+				c_code_slice[k] = fmt.Sprintf("C%024d", k)
+			}
 			query_start  := time.Now().Unix()
 			var count int64 = 0
 			fmt.Printf("Starting go-routine %d\n", i)
@@ -96,7 +100,7 @@ func main(){
 			}
 			bc := new(BCCode)
 			for j := 0; j < total; j++ {
-				err := query_statement.QueryRow(fmt.Sprintf("C%024d", j)).Scan(&bc.B_Code)
+				err := query_statement.QueryRow(c_code_slice[j]).Scan(&bc.B_Code)
 				if err != nil {
 					fmt.Printf("query err %q", err)
 					os.Exit(-1)
