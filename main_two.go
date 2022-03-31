@@ -66,11 +66,11 @@ CREATE INDEX perfTestIndexedColumn ON perfTest ( indexedColumn );`
 		return
 	}
 	//创建索引，有索引和没索引性能差别巨大，根本就不是一个量级，有兴趣的可以去掉试试
-	_, err = db.Exec("CREATE INDEX index_code_type ON BC(code_type);")
-	if err != nil {
-		fmt.Println("create index error->%q: %s\n", err, sqlStmt)
-		return
-	}
+	//_, err = db.Exec("CREATE INDEX index_code_type ON BC(code_type);")
+	//if err != nil {
+	//	fmt.Println("create index error->%q: %s\n", err, sqlStmt)
+	//	return
+	//}
 	//写入10M条记录
 	start := time.Now().Unix()
 	//tx, err := db.Begin()
@@ -98,7 +98,7 @@ CREATE INDEX perfTestIndexedColumn ON perfTest ( indexedColumn );`
 	//query_statement, err := db.Prepare("select b_code, c_code, code_type, is_new from BC where c_code = ? ")
 	query_statements := make([]*sql.Stmt, number_of_db_connections)
 	for i := 0 ; i < number_of_db_connections ; i ++{
-		query_statements[i], _ = db_connections[i].Prepare(" SELECT is_new FROM  BC where code_type = 1 LIMIT 1")
+		query_statements[i], _ = db_connections[i].Prepare(" SELECT nonIndexedColumn FROM  perfTest where indexedColumn = 1 LIMIT 1")
 	}
 	//defer query_statement.Close()
 	for i := 0 ; i < number_of_go_routines ; i ++ {
@@ -115,7 +115,7 @@ CREATE INDEX perfTestIndexedColumn ON perfTest ( indexedColumn );`
 			if err != nil {
 				fmt.Println("select err %q", err)
 			}
-			bc := new(BCCode)
+			//bc := new(BCCode)
 			for j := 0; j < total; j++ {
 				query_statement.QueryRow()//.Scan(&bc.IsNew)
 				//if err != nil {
