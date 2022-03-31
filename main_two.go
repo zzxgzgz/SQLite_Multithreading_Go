@@ -67,9 +67,10 @@ func main(){
 		fmt.Println("insert err %q", err)
 	}
 	defer stmt.Close()
-	var m int = 1000 * 1000
+	var m int = 1000 * 1//000
 	var total int = 1 * m
 	for i := 0; i < total; i++ {
+		rand.Seed(time.Now().UnixNano())
 		_, err = stmt.Exec(rand.Int(), rand.Int())
 		if err != nil {
 			fmt.Println("%q", err)
@@ -90,6 +91,7 @@ func main(){
 		go func(i int, query_statement *sql.Stmt) {
 			c_code_slice := make([]int, total)
 			for k := 0 ; k < total ; k ++ {
+				rand.Seed(time.Now().UnixNano())
 				c_code_slice[k] = rand.Int()
 			}
 			query_start  := time.Now().Unix()
@@ -98,16 +100,16 @@ func main(){
 			if err != nil {
 				fmt.Println("select err %q", err)
 			}
-			//bc := new(BCCode)
+			bc := new(BCCode)
 			for j := 0; j < total; j++ {
-				query_statement.QueryRow(30)//.Scan(&bc.B_Code)
+				query_statement.QueryRow(c_code_slice[j]).Scan(&bc.IsNew)
 				//if err != nil {
 				//	fmt.Printf("query err %q", err)
 				//	os.Exit(-1)
 				//}
 
 				//屏幕输出会花掉好多时间啊，计算耗时的时候还是关掉比较好
-				//fmt.Println("BCode=", bc.B_Code, "\tCCode=", bc.C_Code, "\tCodeType=", bc.CodeType, "\tIsNew=", bc.IsNew)
+				fmt.Println("\tIsNew=", bc.IsNew)
 				count++
 			}
 			readEnd := time.Now().Unix()
