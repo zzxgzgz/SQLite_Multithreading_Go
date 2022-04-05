@@ -1,185 +1,132 @@
 package main
 
+
+
 import (
-	"SQLite_Multithreading_Go/worker_pool"
 	"database/sql"
-	_ "github.com/mattn/go-sqlite3"
-	"log"
-	"math/rand"
+	"fmt"
+	"math"
+	"os"
 	"runtime"
 	"sync"
 	"time"
+	_ "github.com/mattn/go-sqlite3"
 )
 
-var (
-	// MaxWorker Number of Workers
-	MaxWorker = runtime.NumCPU() //* 2
-	// MaxQueue Max Size of the Job Queue
-	MaxQueue = 1024
-	// NumberOfPeople how many people to generate
-	NumberOfPeople = 1024 * 1024 //* 20
-	// JobQueue a queue that sends the sql.Stmt jobs to the workers
-	JobQueue chan *worker_pool.Job
-	letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	// InsertStatement INSERT INTO people (firstname, lastname) VALUES (?, ?)
-	InsertStatement *sql.Stmt
-	QueryStatement *sql.Stmt
-	peopleSlice []*People
-	allQueryStart time.Time
-	allQueryEnd time.Time
-	//database *sql.DB
-	//db_connections []*sql.DB
-	db_write_connection *sql.DB
-	db_create_connection *sql.DB
-	db_read_connection *sql.DB
-)
+var stub = make([]byte, 1024 * 1024 * 1024 * 4)
 
 func main(){
+	// allow the program to use all cores.
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	JobQueue = make(chan *worker_pool.Job, MaxQueue)
-	//db_connections = make([]*sql.DB, MaxWorker)
-	log.Println("Hello world!")
-	//for i := 0 ; i < MaxWorker ; i ++ {
-	//	db_connections[i], _ = sql.Open("sqlite3", "file:./rio_testing.db?cache=shared&mode=rwc")
-	//}
-	// mode: read write
-	db_write_connection, _ = sql.Open("sqlite3", "file:./rio_testing.db?&mode=rw&_journal_mode=wal&_txlock=immediate")
-	// only ONE writer, as SQLite doesn't support multiple concurrent write.
-	db_write_connection.SetMaxOpenConns(1)
-	// mode: read only
-	db_read_connection, _ = sql.Open("sqlite3", "file:./rio_testing.db?&mode=ro&_journal_mode=wal&_mutex=full&cache=shared&loc=auto")
-	// can have many readers
-	db_read_connection.SetMaxOpenConns(MaxWorker)
-	// mode: read write create
-	db_create_connection, _ = sql.Open("sqlite3", "file:./rio_testing.db?&mode=rwc&_journal_mode=wal")
-
-	// Open the database, this command creates the .db file if it doesn't exist.
-	//database, _ = sql.Open("sqlite3", "./rio_testing.db?cache=shared&mode=rwc")
-	//database.SetMaxOpenConns(MaxWorker)
-	wg := sync.WaitGroup{}
-	// run the job dispatcher.
-	dispatcher := worker_pool.NewDispatcher(MaxWorker, JobQueue, &wg)
-	dispatcher.Run()
-
-	// Create table if it doesn't already exist/
-	CreateTableStatement, _ := db_create_connection.Prepare("CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, firstname TEXT, lastname TEXT)")
-	CreateTableStatement.Exec()
-
-	// Clear the table so that it is empty.
-	TruncateTableStatement, _ := db_create_connection.Prepare("DELETE FROM people")
-	TruncateTableStatement.Exec()
-
-	CreateFirstNameIndexStatement, _ := db_create_connection.Prepare("CREATE INDEX IF NOT EXISTS idx_people_firstname ON people (firstname)")
-	CreateFirstNameIndexStatement.Exec()
-
-	//CreateLastNameIndexStatement, _ := db_create_connection.Prepare("CREATE INDEX IF NOT EXISTS idx_people_lastname ON people (lastname)")
-	//CreateLastNameIndexStatement.Exec()
-
-	// close the create table connection
-	db_create_connection.Close()
-
-	GeneratePeople()
-
-	insertPeopleStartTime := time.Now()
-	InsertPeopleIntoDB()
-	insertPeopleEndTime := time.Now()
-	log.Printf("Inserting %d people took %v", NumberOfPeople, insertPeopleEndTime.Sub(insertPeopleStartTime))
-
-	// close the write connection
-	db_write_connection.Close()
-
-	wg.Add(NumberOfPeople)
-	QueryPeopleFromDB()
-	wg.Wait()
-	allQueryEnd = time.Now()
-
-	log.Printf("To query %d people, it took time: %v", NumberOfPeople, allQueryEnd.Sub(allQueryStart))
-
-}
-
-// People simple struct that represents a person.
-type People struct {
-	FirstName string
-	LastName string
-}
-
-// randString generates random string with length size
-func randString(size int) string{
-	b := make([]rune, size)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
+	// allocate memory for the program.
+	stub[0] = 1
+	type BCCode struct {
+		B_Code string
+		C_Code string
+		CodeType int
+		IsNew int
 	}
-	return string(b)
-}
+	number_of_go_routines := 20
 
-// GeneratePeople generates people and random first/last names and put them into a slice.
-func GeneratePeople(){
-	peopleSlice = make([]*People, NumberOfPeople)
-	rand.Seed(time.Now().UnixNano())
-	for i:=0 ; i < NumberOfPeople ; i ++ {
-		peopleSlice[i] = &People{
-			FirstName: randString(rand.Intn(10) + 1),
-			LastName:  randString(rand.Intn(10) + 1),
-		}
+	// Open the connection to the DB, will create the .db file is it does not exist.
+	db, err := sql.Open("sqlite3", "file:./rio_testing.db?loc=auto&_journal_mode=wal&_mutex=no")
+
+
+
+	// one DB connection can be used by two go-routines
+	number_of_db_connections := int(math.Ceil(float64(number_of_go_routines) / 2.0))
+
+
+
+	db_connections := make([]*sql.DB, number_of_db_connections)
+
+
+	// create multiple db connections for concurrent read.
+	for i := 0 ; i < number_of_db_connections ; i ++{
+		db_connections[i],_ = sql.Open("sqlite3", "file:./rio_testing.db?loc=auto&_journal_mode=wal&_mutex=no")
 	}
-	log.Printf("Gernated %d people!", NumberOfPeople)
-}
 
-// InsertPeopleIntoDB When writing into a sqlite db, we'd better do it sequentially,
-// or it will cause LOCK related errors
-func InsertPeopleIntoDB() {
-	tx, _ := db_write_connection.Begin()
-	InsertStatement, _ = tx.Prepare("INSERT INTO people (firstname, lastname) VALUES (?, ?)")
-	for i, _ := range peopleSlice {
-		ArgumentsInterface := make([]interface{}, 2)
-		ArgumentsInterface[0] = peopleSlice[i].FirstName
-		ArgumentsInterface[1] = peopleSlice[i].LastName
-
-		_, err := InsertStatement.Exec(ArgumentsInterface[0], ArgumentsInterface[1])
+	db.SetMaxOpenConns(1)
+	if err != nil {
+		fmt.Println("SQLite:", err)
+	}
+	fmt.Println("SQLite start")
+	//Create the table
+	sqlStmt := `create table BC (b_code text not null primary key, c_code text not null, code_type INTEGER, is_new INTEGER);`
+	_, err = db.Exec(sqlStmt)
+	if err != nil {
+		fmt.Printf("create table error->%q: %s\n", err, sqlStmt)
+		return
+	}
+	//Create index on column
+	_, err = db.Exec("CREATE INDEX inx_c_code ON BC(c_code);")
+	if err != nil {
+		fmt.Println("create index error->%q: %s\n", err, sqlStmt)
+		return
+	}
+	//Start time measuring
+	start := time.Now().Unix()
+	tx, err := db.Begin()
+	if err != nil {
+		fmt.Printf("%q\n", err)
+	}
+	// prepare insert statement
+	stmt, err := tx.Prepare("insert into BC(b_code, c_code, code_type, is_new ) values(?,?,?,?)")
+	if err != nil {
+		fmt.Printf("insert err %q\n", err)
+	}
+	db.Close()
+	defer stmt.Close()
+	var m int = 1000 * 1000
+	var total int = 1 * m
+	for i := 0; i < total; i++ {
+		_, err = stmt.Exec(fmt.Sprintf("B%024d", i), fmt.Sprintf("C%024d", i), 0, 1)
 		if err != nil {
-			log.Fatalf("Error happened when inserting people %d: %s", i, err.Error())
+			fmt.Println("%q", err)
 		}
 	}
 	tx.Commit()
-	InsertStatement.Close()
-}
-
-// QueryPeopleFromDB When reading from a sqlite db, we can send queries concurrently
-func QueryPeopleFromDB(){
-	//QueryPeopleStatementSlice := make([]*sql.Stmt, NumberOfPeople)
-	//for i, _ := range peopleSlice {
-	//	queryPeopleString := fmt.Sprintf("SELECT id, firstname, lastname FROM people WHERE firstname = '%s' AND lastname = '%s'", peopleSlice[i].FirstName, peopleSlice[i].LastName)
-	//	QueryPeopleStatementSlice[i],_ = database.Prepare(queryPeopleString)
-	//}
-	//allQueryStart = time.Now()
-	//for i,_ := range QueryPeopleStatementSlice {
-	//	JobQueue <- worker_pool.Job{
-	//		Payload: QueryPeopleStatementSlice[i],
-	//		Args:    nil,
-	//	}
-	//}
-	allQueryStart = time.Now()
-	//QueryStatementSlice := make([]*sql.Stmt, MaxWorker)
-	//for i := 0 ; i < MaxWorker ; i ++ {
-	//	QueryStatementSlice[i], _ = db_connections[i].Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
-	//}
-	//var id int
-	//var firstName string
-	//var lastName string
-	QueryStatement, _ = db_read_connection.Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
-	//QueryStatement, _ = database.Prepare("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?")
-	for index, _ := range peopleSlice {
-		JobQueue <- &worker_pool.Job{
-			Payload: QueryStatement,
-			Args:    []interface{}{peopleSlice[index].FirstName, peopleSlice[index].LastName},
-		}
-		//row:=db_read_connection.QueryRow("SELECT id, firstname, lastname FROM people WHERE firstname = ? AND lastname = ?", peopleSlice[index].FirstName, peopleSlice[index].LastName)
-		////row := QueryStatement.QueryRow(peopleSlice[index].FirstName, peopleSlice[index].LastName)
-		//row.Scan(&id, &firstName, &lastName)
-		////queryEnd.Sub(queryStart)
-		//if firstName != peopleSlice[index].FirstName || lastName != peopleSlice[index].LastName {
-		//	panic(fmt.Sprintf("Query for firstname: %s, lastname: %s; got firstname: %s, lastname: %s",
-		//		peopleSlice[index].FirstName, peopleSlice[index].LastName, firstName, lastName))
-		//}
+	insertEnd := time.Now().Unix()
+	// Start the querying
+	wg := sync.WaitGroup{}
+	// Prepare the select statements for each db read connection.
+	query_statements := make([]*sql.Stmt, number_of_db_connections)
+	for i := 0 ; i < number_of_db_connections ; i ++{
+		query_statements[i], _ = db_connections[i].Prepare("select b_code from BC where c_code = ? ")
 	}
+	// Start querying in each go-routine, each go-routine query `total` times.
+	for i := 0 ; i < number_of_go_routines ; i ++ {
+		wg.Add(1)
+		go func(i int, query_statement *sql.Stmt) {
+			query_start := time.Now().Unix()
+			var count int64 = 0
+			fmt.Printf("Starting go-routine %d\n", i)
+			if err != nil {
+				fmt.Println("select err %q", err)
+			}
+			//bc := new(BCCode)
+			var b string
+			for j := 0; j < total; j++ {
+				//var rowCount int
+				err := query_statement.QueryRow(fmt.Sprintf("C%024d", j)).Scan(&b)
+				if err != nil {
+					fmt.Printf("query err %q", err)
+					os.Exit(-1)
+				}
+
+
+
+				// Comment out the outputs, as it slows down the code.
+				//fmt.Println("BCode=", bc.B_Code, "\tCCode=", bc.C_Code, "\tCodeType=", bc.CodeType, "\tIsNew=", bc.IsNew)
+				count++
+			}
+			readEnd := time.Now().Unix()
+			fmt.Println("go-routine: ", i , "insert span=", (insertEnd - start),
+				"read span=", (readEnd - query_start),
+				"avg read=", float64(readEnd-query_start)*1000/float64(count))
+			wg.Done()
+		}(i, query_statements[i % number_of_db_connections])
+	}
+	wg.Wait()
+	fmt.Println("All finished.")
 }
