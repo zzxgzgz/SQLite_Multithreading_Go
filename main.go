@@ -19,7 +19,7 @@ var stub = make([]byte, 1024 * 1024 * 1024 * 4)
 
 func main(){
 	destination_host_ip := "123.223.32.4"
-	destination_host_ip_int := int(IP6toInt(net.ParseIP(destination_host_ip)).Int64())
+	destination_host_ip_int := (IP6toInt(net.ParseIP(destination_host_ip)).Int64())
 	// allow the program to use all cores.
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	// allocate memory for the program.
@@ -35,7 +35,7 @@ func main(){
 	vni_slice = append(vni_slice, 1)
 
 	// Create a CIDR for all VPCs
-	cidr_pointer, _ := cidr.ParseCIDR("10.0.0.0/24")
+	cidr_pointer, _ := cidr.ParseCIDR("10.0.0.0/8")
 
 	ip_slice := make([]int, 0)
 
@@ -128,7 +128,7 @@ func main(){
 				fmt.Println("select err %q", err)
 			}
 			//bc := new(BCCode)
-			var b string
+			var b int64
 			for j := 0; j < total; j++ {
 				//var rowCount int
 				err := query_statement.QueryRow(ip_slice[i]).Scan(&b)
@@ -136,9 +136,16 @@ func main(){
 					fmt.Printf("query err %q", err)
 					os.Exit(-1)
 				}
-
+				/* Comment out the converting code for testing purpose.
+				c := net.IP(big.NewInt(b).Bytes())
 				// Comment out the outputs, as it slows down the code.
-				//fmt.Println("BCode=", bc.B_Code, "\tCCode=", bc.C_Code, "\tCodeType=", bc.CodeType, "\tIsNew=", bc.IsNew)
+				b0 := strconv.FormatInt((b>>24)&0xff, 10)
+				b1 := strconv.FormatInt((b>>16)&0xff, 10)
+				b2 := strconv.FormatInt((b>>8)&0xff, 10)
+				b3 := strconv.FormatInt((b & 0xff), 10)
+				fmt.Printf("%v.%v.%v.%v\n", b0, b1, b2, b3 )
+				fmt.Printf("Raw: %v, IP Address: %v, v4: %v, v6: %v\n",b , c.String(), c.To4().String(), c.To16().String())
+				*/
 				count++
 			}
 			readEnd := time.Now().Unix()
