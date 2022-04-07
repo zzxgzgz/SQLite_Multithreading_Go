@@ -36,7 +36,7 @@ func main(){
 	vni_slice = append(vni_slice, 123)
 
 	// Create a CIDR for all VPCs
-	cidr_pointer, _ := cidr.ParseCIDR("10.0.0.0/24")
+	cidr_pointer, _ := cidr.ParseCIDR("10.0.0.0/8")
 
 	ip_slice := make([]uint64, 0)
 
