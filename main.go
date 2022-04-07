@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/binary"
 	"fmt"
 	"github.com/3th1nk/cidr"
 	_ "github.com/mattn/go-sqlite3"
@@ -32,16 +33,22 @@ func main(){
 	vni_slice := make([]int, 0)
 
 	// add a default VNI to this slice, could add more in the future.
-	vni_slice = append(vni_slice, 1)
+	vni_slice = append(vni_slice, 123)
 
 	// Create a CIDR for all VPCs
-	cidr_pointer, _ := cidr.ParseCIDR("10.0.0.0/8")
+	cidr_pointer, _ := cidr.ParseCIDR("10.0.0.0/24")
 
-	ip_slice := make([]int, 0)
+	ip_slice := make([]uint64, 0)
 
 	if cidr_pointer.IsIPv4(){
 		cidr_pointer.ForEachIP(func(ip string) error {
-			ip_slice = append(ip_slice, int(IP6toInt(net.ParseIP(ip)).Int64()))
+			//for _, vni := range vni_slice {
+			//
+			//	ip_plus_vni_int := IP6VniToInt(net.ParseIP(ip), int64(vni))
+			//	fmt.Println(ip_plus_vni_int.Bytes())
+			//	ip_slice = append(ip_slice, ip_plus_vni_int)
+			//}
+			ip_slice = append(ip_slice, (IP6toInt(net.ParseIP(ip)).Uint64()))
 			return nil
 		})
 	}else if cidr_pointer.IsIPv6(){
@@ -75,14 +82,21 @@ func main(){
 	}
 	fmt.Println("SQLite start")
 	//Create the table, INTEGER key and INTEGER value
-	sqlStmt := `create table IF NOT EXISTS BC (RowKey INTEGER not null primary key, RowValue INTEGER not null);`
+	sqlStmt := `create table IF NOT EXISTS BC (RowKey INTEGER not null primary key, RowKeyTwo INTEGER not null, RowValue INTEGER not null);`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
 		fmt.Printf("create table error->%q: %s\n", err, sqlStmt)
 		return
 	}
-	//Create index on column
+	//Create index on column 1
 	_, err = db.Exec("CREATE INDEX index_row_key ON BC(RowKey);")
+	if err != nil {
+		fmt.Println("create index error->%q: %s\n", err, sqlStmt)
+		return
+	}
+
+	//Create index on column 2
+	_, err = db.Exec("CREATE INDEX index_row_key_two ON BC(RowKeyTwo);")
 	if err != nil {
 		fmt.Println("create index error->%q: %s\n", err, sqlStmt)
 		return
@@ -94,7 +108,7 @@ func main(){
 		fmt.Printf("%q\n", err)
 	}
 	// prepare insert statement
-	stmt, err := tx.Prepare("insert into BC(RowKey, RowValue) values(?,?)")
+	stmt, err := tx.Prepare("insert into BC(RowKey, RowKeyTwo, RowValue) values(?,?,?)")
 	if err != nil {
 		fmt.Printf("insert err %q\n", err)
 	}
@@ -103,7 +117,7 @@ func main(){
 	var m int = len(ip_slice)//1000 * 1000
 	var total int = 1 * m
 	for i := 0; i < total; i++ {
-		_, err = stmt.Exec(ip_slice[i], destination_host_ip_int)
+		_, err = stmt.Exec(ip_slice[i], vni_slice[0], destination_host_ip_int)
 		if err != nil {
 			fmt.Printf("Insert error: %q", err)
 		}
@@ -115,7 +129,7 @@ func main(){
 	// Prepare the select statements for each db read connection.
 	query_statements := make([]*sql.Stmt, number_of_db_connections)
 	for i := 0 ; i < number_of_db_connections ; i ++{
-		query_statements[i], _ = db_connections[i].Prepare("select RowValue from BC where RowKey = ? ")
+		query_statements[i], _ = db_connections[i].Prepare("select RowValue from BC where RowKey = ? AND RowKeyTwo = ? ")
 	}
 	// Start querying in each go-routine, each go-routine query `total` times.
 	for i := 0 ; i < number_of_go_routines ; i ++ {
@@ -131,20 +145,20 @@ func main(){
 			var b int64
 			for j := 0; j < total; j++ {
 				//var rowCount int
-				err := query_statement.QueryRow(ip_slice[i]).Scan(&b)
+				err := query_statement.QueryRow(ip_slice[i], vni_slice[0]).Scan(&b)
 				if err != nil {
 					fmt.Printf("query err %q", err)
 					os.Exit(-1)
 				}
 				/* Comment out the converting code for testing purpose.
-				c := net.IP(big.NewInt(b).Bytes())
+				fmt.Printf("IP: %v\n", ip_slice[i])
+				//c := net.IP(big.NewInt(b).Bytes())
 				// Comment out the outputs, as it slows down the code.
 				b0 := strconv.FormatInt((b>>24)&0xff, 10)
 				b1 := strconv.FormatInt((b>>16)&0xff, 10)
 				b2 := strconv.FormatInt((b>>8)&0xff, 10)
 				b3 := strconv.FormatInt((b & 0xff), 10)
 				fmt.Printf("%v.%v.%v.%v\n", b0, b1, b2, b3 )
-				fmt.Printf("Raw: %v, IP Address: %v, v4: %v, v6: %v\n",b , c.String(), c.To4().String(), c.To16().String())
 				*/
 				count++
 			}
@@ -181,6 +195,16 @@ func IP6toInt(IPv6Address net.IP) *big.Int {
 	// from http://golang.org/pkg/net/#pkg-constants
 	// IPv6len = 16
 	IPv6Int.SetBytes(IPv6Address.To16())
+	return IPv6Int
+}
+
+func IP6VniToInt(IPv6Address net.IP, vni int64) *big.Int {
+	IPv6Int := big.NewInt(0)
+	// from http://golang.org/pkg/net/#pkg-constants
+	// IPv6len = 16
+	vni_bytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(vni_bytes, big.NewInt(vni).Uint64())
+	IPv6Int.SetBytes(append(IPv6Address.To16(), vni_bytes... ))
 	return IPv6Int
 }
 
