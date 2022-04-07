@@ -89,18 +89,18 @@ func main(){
 		return
 	}
 	//Create index on column 1
-	_, err = db.Exec("CREATE INDEX index_row_key ON BC(RowKey);")
+	_, err = db.Exec("CREATE INDEX index_row_key ON BC(RowKey, RowKeyTwo);")
 	if err != nil {
 		fmt.Println("create index error->%q: %s\n", err, sqlStmt)
 		return
 	}
 
 	//Create index on column 2
-	_, err = db.Exec("CREATE INDEX index_row_key_two ON BC(RowKeyTwo);")
-	if err != nil {
-		fmt.Println("create index error->%q: %s\n", err, sqlStmt)
-		return
-	}
+	//_, err = db.Exec("CREATE INDEX index_row_key_two ON BC(RowKeyTwo);")
+	//if err != nil {
+	//	fmt.Println("create index error->%q: %s\n", err, sqlStmt)
+	//	return
+	//}
 	//Start time measuring
 	start := time.Now().Unix()
 	tx, err := db.Begin()
