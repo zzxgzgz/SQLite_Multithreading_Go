@@ -26,7 +26,7 @@ func main(){
 	// allocate memory for the program.
 	stub[0] = 1
 	type Row struct {
-		RowKey int64
+		RowKey string
 		RowValue int64
 	}
 
@@ -36,11 +36,12 @@ func main(){
 	vni_slice = append(vni_slice, 123)
 
 	// Create a CIDR for all VPCs
-	cidr_pointer, _ := cidr.ParseCIDR("10.0.0.0/8")
+	cidr_pointer, _ := cidr.ParseCIDR("2001:0db8:85a3:0000:0000:8a2e:0370:7334/104")
 
-	ip_slice := make([]uint64, 0)
+	ip_slice := make([]string, 0)
 
 	if cidr_pointer.IsIPv4(){
+		fmt.Println("We have IPV4 address!")
 		cidr_pointer.ForEachIP(func(ip string) error {
 			//for _, vni := range vni_slice {
 			//
@@ -48,11 +49,21 @@ func main(){
 			//	fmt.Println(ip_plus_vni_int.Bytes())
 			//	ip_slice = append(ip_slice, ip_plus_vni_int)
 			//}
-			ip_slice = append(ip_slice, (IP6toInt(net.ParseIP(ip)).Uint64()))
+			ip_slice = append(ip_slice, (IP6toInt(net.ParseIP(ip)).String()))
 			return nil
 		})
 	}else if cidr_pointer.IsIPv6(){
-		// TODO: Implement IPV6 function
+		fmt.Println("We have IPV6 address!")
+		cidr_pointer.ForEachIP(func(ip string) error {
+			//for _, vni := range vni_slice {
+			//
+			//	ip_plus_vni_int := IP6VniToInt(net.ParseIP(ip), int64(vni))
+			//	fmt.Println(ip_plus_vni_int.Bytes())
+			//	ip_slice = append(ip_slice, ip_plus_vni_int)
+			//}
+			ip_slice = append(ip_slice, ip)
+			return nil
+		})
 	}else{
 		panic("This CIDR is neither v4 nor v6, existing")
 	}
@@ -82,13 +93,14 @@ func main(){
 	}
 	fmt.Println("SQLite start")
 	//Create the table, INTEGER key and INTEGER value
-	sqlStmt := `create table IF NOT EXISTS BC (RowKey INTEGER not null primary key, RowKeyTwo INTEGER not null, RowValue INTEGER not null);`
+	// add mac address, put VNI at first
+	sqlStmt := `create table IF NOT EXISTS BC (RowKey TEXT not null primary key, RowKeyTwo INTEGER not null, RowValue INTEGER not null);`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
 		fmt.Printf("create table error->%q: %s\n", err, sqlStmt)
 		return
 	}
-	//Create index on column 1
+	//Create index on column 1, index on neighbor_ip and VNI
 	_, err = db.Exec("CREATE INDEX index_row_key ON BC(RowKey, RowKeyTwo);")
 	if err != nil {
 		fmt.Println("create index error->%q: %s\n", err, sqlStmt)
